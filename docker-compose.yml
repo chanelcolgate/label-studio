@@ -1,0 +1,56 @@
+version: "3.8"
+services:
+  label_studio:
+    image: heartexlabs/label-studio:latest
+    container_name: label_studio
+    ports:
+      - 8508:8080
+    volumes:
+      - ./mydata:/label-studio/data
+    networks:
+      - label_studio_network
+
+  predict:
+    image: "tensorflow/serving"
+    container_name: predict
+    ports:
+      - "8500:8500"
+      - "8502:8501"
+    volumes:
+      - "${PWD-.}/vit/saved_model:/models/vit"
+    environment:
+      - MODEL_NAME=vit
+      - MODEL_BASE_PATH=/models
+    networks:
+      - label_studio_network
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    hostname: redis
+    volumes:
+      - "./data/redis:/data"
+    expose:
+      - 6379
+
+  server:
+    container_name: server
+    build: .
+    environment:
+      - RQ_QUEUE_NAME=default
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - 9090:9090
+    depends_on:
+      - redis
+    links:
+      - redis
+    volumes:
+      - "./mydata/media:/data"
+      - "./logs:/tmp"
+    networks:
+      - label_studio_network
+
+networks:
+  label_studio_network:
